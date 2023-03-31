@@ -1,0 +1,1 @@
+# copy-translate-nextra-mdx
