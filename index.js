@@ -10,7 +10,7 @@ function replaceMetaData(text, blockArray) {
 	const JsxRegexEnd = /<\/[\s\S]*?>/g;
 	const codeBlockRegex = /```([\s\S]*?)```/g;
 	const LinkBlockRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
-	const LinkBlockUrlregex = /<([^>]+)>/g;
+	const LinkBlockUrlRegex = /<([^>]+)>/g;
 	let match;
 	const blocks = [];
 	let currentIndex = blockArray.length;
@@ -19,7 +19,7 @@ function replaceMetaData(text, blockArray) {
 		// сохраняем блок в список с уникальным индексом
 		blocks.push({ index: currentIndex++, content: match[0], type: "head" });
 	}
-	while ((match = LinkBlockUrlregex.exec(text)) !== null) {
+	while ((match = LinkBlockUrlRegex.exec(text)) !== null) {
 		// сохраняем блок в список с уникальным индексом
 		blocks.push({ index: currentIndex++, content: match[0], type: "url" });
 	}
@@ -61,12 +61,16 @@ const translateMarkdownFile = async (inputFilePath, outputFilePath, languageCode
 	const codeBlocks = [];
 
 	const result = replaceMetaData(data, codeBlocks);
+	let translatedFileContent = "";
 
 	//console.log(result.text);
 
-	const translated = await translate.translate(result.text, { to: languageCode });
-
-	let translatedFileContent = translated.text;
+	if (onlyCopy) {
+		translatedFileContent = data;
+	} else {
+		const translated = await translate.translate(result.text, { to: languageCode });
+		translatedFileContent = translated.text;
+	}
 
 	for (const block of codeBlocks) {
 		const blockPlaceholder = `|****${block.index}****|`;
@@ -106,14 +110,24 @@ function processFiles(dirPath, processedFiles) {
 							// Проверяем, что файл с таким именем не существует
 							if (!fs.existsSync(newFilePath)) {
 								if (path.extname(filePath) === ".md" || path.extname(filePath) === ".mdx") {
-									tileSleep += 5000;
+									if (!onlyCopy) {
+										tileSleep += 60000;
+									}
 									setTimeout(() => {
 										translateMarkdownFile(filePath, newFilePath, targetLanguageCode)
 											.then(() => {
-												console.log(`The file has been successfully translated and saved to ${newFilePath}`);
+												if (!onlyCopy) {
+													console.log(`The file has been successfully translated and saved to ${newFilePath}`);
+												} else {
+													console.log(`The file was copied successfully to ${newFilePath}`);
+												}
 											})
 											.catch((err) => {
-												console.error(`An error occurred while translating the File: ${filePath} | Error: ${err.message}`);
+												if (!onlyCopy) {
+													console.error(`An error occurred while translating the File: ${filePath} | Error: ${err.message}`);
+												} else {
+													console.error(`Error when copying the File: ${filePath} | Error: ${err.message}`);
+												}
 											});
 									}, tileSleep);
 								} else {
@@ -254,7 +268,7 @@ const languageCodes = [
 	"zu",
 ]; // Список поддерживаемых языковых кодов node js
 const targetLanguageCode = process.argv[3];
-
+const onlyCopy = process.argv[4] === "-c" || process.argv[4] === "-C";
 let tileSleep = 0;
 
 const dirPath = process.argv[2];
